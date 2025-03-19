@@ -55,7 +55,7 @@ func main() {
 
 	// Print the results and save new files
 	fmt.Printf("Found %d properties in Utrecht under €2500\n", len(properties))
-	
+
 	newCount := 0
 	for _, property := range properties {
 		// Check if property already exists
@@ -70,12 +70,12 @@ func main() {
 			fmt.Printf("   Rooms: %s\n", property.Rooms)
 			fmt.Printf("   URL: %s\n", property.URL)
 			fmt.Printf("   Hash: %s\n", property.Hash)
-			
+
 			// Save property to JSON file
 			savePropertyToFile(property, *outputDir)
 		}
 	}
-	
+
 	fmt.Printf("\nSummary: %d new properties found out of %d total listings\n", newCount, len(properties))
 }
 
@@ -87,16 +87,16 @@ func savePropertyToFile(property Property, outputDir string) {
 		log.Printf("Error creating JSON for property %s: %v", property.Title, err)
 		return
 	}
-	
+
 	// Create filename using hash to ensure uniqueness
 	filename := filepath.Join(outputDir, property.Hash+".json")
-	
+
 	// Write to file
 	if err := os.WriteFile(filename, jsonData, 0644); err != nil {
 		log.Printf("Error writing property to file %s: %v", filename, err)
 		return
 	}
-	
+
 	fmt.Printf("   Saved to %s\n", filename)
 }
 
@@ -183,8 +183,7 @@ func extractPriceValue(priceStr string) int32 {
 
 	numStr = strings.Replace(numStr, ".", "", -1)
 
-	// Parse the string to a float
-	fmt.Printf("extracting %s\n", numStr)
+	// Parse the string to a int32
 	value, err := strconv.ParseInt(numStr, 10, 32)
 	if err != nil {
 		return 0
