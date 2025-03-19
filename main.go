@@ -27,7 +27,7 @@ func main() {
 	// Parse command line arguments
 	outputDir := flag.String("output", "", "Directory to save property JSON files")
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
-	searchURL := flag.String("url", "https://www.pararius.nl/huurwoningen/utrecht/0-2500", "URL to search for properties")
+	searchURL := flag.String("url", "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2", "URL to search for properties")
 	flag.Parse()
 
 	if *outputDir == "" {
@@ -63,7 +63,7 @@ func main() {
 
 // runPeriodicPropertyChecks runs property checks every 5 minutes
 func runPeriodicPropertyChecks(url, outputDir string, bot *TelegramBot) {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
 	// Run once immediately
@@ -78,16 +78,16 @@ func runPeriodicPropertyChecks(url, outputDir string, bot *TelegramBot) {
 // checkForNewProperties checks for new properties and notifies subscribers
 func checkForNewProperties(url, outputDir string, bot *TelegramBot) {
 	log.Println("Checking for new properties...")
-	
+
 	// Fetch properties
 	properties, err := FetchProperties(url)
 	if err != nil {
 		log.Printf("Error fetching properties: %v", err)
 		return
 	}
-	
+
 	log.Printf("Found %d properties in total", len(properties))
-	
+
 	// Check for new properties
 	var newProperties []Property
 	for _, property := range properties {
@@ -95,22 +95,19 @@ func checkForNewProperties(url, outputDir string, bot *TelegramBot) {
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
 			// This is a new property
 			newProperties = append(newProperties, property)
-			
+
 			// Save property to file
 			savePropertyToFile(property, outputDir)
 		}
 	}
-	
+
 	// Notify subscribers about new properties
 	if len(newProperties) > 0 {
 		log.Printf("Found %d new properties", len(newProperties))
-		
+
 		// Only notify if there are subscribers
 		if bot.HasSubscribers() {
-			// Send summary message
-			summaryMsg := fmt.Sprintf("🏠 Found %d new properties! 🏠", len(newProperties))
-			bot.NotifySubscribers(summaryMsg)
-			
+
 			// Send individual property details
 			for _, prop := range newProperties {
 				message := formatPropertyMessage(prop)
@@ -132,10 +129,10 @@ func formatPropertyMessage(property Property) string {
 	} else {
 		priceStr = "Price unknown"
 	}
-	
-	message := fmt.Sprintf("*%s*\n", property.Title)
+
+	message := fmt.Sprintf("📍*%s*\n", property.Title)
 	if property.Address != "" {
-		message += fmt.Sprintf("📍 %s\n", property.Address)
+		message += fmt.Sprintf(" %s\n", property.Address)
 	}
 	message += fmt.Sprintf("💰 %s\n", priceStr)
 	if property.Size != "" {
@@ -145,7 +142,7 @@ func formatPropertyMessage(property Property) string {
 		message += fmt.Sprintf("🚪 %s\n", property.Rooms)
 	}
 	message += fmt.Sprintf("🔗 [View on Pararius](%s)", property.URL)
-	
+
 	return message
 }
 

@@ -68,6 +68,10 @@ func (t *TelegramBot) Start() {
 	}
 }
 
+func (t *TelegramBot) HasSubscribers() bool {
+	return len(t.subscribers) > 0
+}
+
 // handleSubscribe handles the /subscribe command
 func (t *TelegramBot) handleSubscribe(message *tgbotapi.Message, reply *tgbotapi.MessageConfig) {
 	chatID := message.Chat.ID
@@ -98,9 +102,4 @@ func (t *TelegramBot) NotifySubscribers(message string) {
 			log.Printf("Error sending notification to %d: %v", chatID, err)
 		}
 	}
-}
-
-// HasSubscribers returns true if there are any subscribers
-func (t *TelegramBot) HasSubscribers() bool {
-	return len(t.subscribers) > 0
 }
