@@ -3,9 +3,13 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,8 +31,21 @@ type Property struct {
 }
 
 func main() {
+	// Parse command line arguments
+	outputDir := flag.String("output", "", "Directory to save property JSON files")
+	flag.Parse()
+
+	if *outputDir == "" {
+		log.Fatal("Please provide an output directory using the -output flag")
+	}
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(*outputDir, 0755); err != nil {
+		log.Fatalf("Failed to create output directory: %v", err)
+	}
+
 	// URL to fetch
-	url := "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2"
+	url := "https://www.pararius.nl/huurwoningen/utrecht/0-2500"
 
 	// Fetch the page
 	properties, err := fetchProperties(url)
@@ -36,7 +53,7 @@ func main() {
 		log.Fatalf("Error fetching properties: %v", err)
 	}
 
-	// Print the results
+	// Print the results and save to files
 	fmt.Printf("Found %d properties in Utrecht under €2500\n\n", len(properties))
 	for i, property := range properties {
 		fmt.Printf("%d. %s\n", i+1, property.Title)
@@ -46,7 +63,31 @@ func main() {
 		fmt.Printf("   Rooms: %s\n", property.Rooms)
 		fmt.Printf("   URL: %s\n", property.URL)
 		fmt.Printf("   Hash: %s\n\n", property.Hash)
+		
+		// Save property to JSON file
+		savePropertyToFile(property, *outputDir)
 	}
+}
+
+// savePropertyToFile saves a property as a JSON file
+func savePropertyToFile(property Property, outputDir string) {
+	// Create JSON data
+	jsonData, err := json.MarshalIndent(property, "", "  ")
+	if err != nil {
+		log.Printf("Error creating JSON for property %s: %v", property.Title, err)
+		return
+	}
+	
+	// Create filename using hash to ensure uniqueness
+	filename := filepath.Join(outputDir, property.Hash+".json")
+	
+	// Write to file
+	if err := os.WriteFile(filename, jsonData, 0644); err != nil {
+		log.Printf("Error writing property to file %s: %v", filename, err)
+		return
+	}
+	
+	fmt.Printf("Saved property to %s\n", filename)
 }
 
 func fetchProperties(url string) ([]Property, error) {
