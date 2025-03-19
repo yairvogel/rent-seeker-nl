@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,6 +23,7 @@ type Property struct {
 	Type        string
 	URL         string
 	Description string
+	Hash        string // Hash of URL for deduplication
 }
 
 func main() {
@@ -41,7 +44,8 @@ func main() {
 		fmt.Printf("   Price: %d\n", property.PriceValue)
 		fmt.Printf("   Size: %s\n", property.Size)
 		fmt.Printf("   Rooms: %s\n", property.Rooms)
-		fmt.Printf("   URL: %s\n\n", property.URL)
+		fmt.Printf("   URL: %s\n", property.URL)
+		fmt.Printf("   Hash: %s\n\n", property.Hash)
 	}
 }
 
@@ -100,6 +104,9 @@ func fetchProperties(url string) ([]Property, error) {
 			}
 		})
 
+		// Create hash of URL for deduplication
+		urlHash := generateHash(url)
+
 		// Create property object
 		property := Property{
 			Title:      title,
@@ -108,6 +115,7 @@ func fetchProperties(url string) ([]Property, error) {
 			Size:       size,
 			Rooms:      rooms,
 			URL:        url,
+			Hash:       urlHash,
 		}
 
 		properties = append(properties, property)
@@ -132,4 +140,10 @@ func extractPriceValue(priceStr string) int32 {
 	}
 
 	return int32(value)
+}
+
+// generateHash creates a SHA-256 hash of the input string
+func generateHash(input string) string {
+	hash := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(hash[:])
 }
