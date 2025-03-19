@@ -37,7 +37,7 @@ func main() {
 	}
 
 	// URL to fetch
-	url := "https://www.pararius.nl/huurwoningen/utrecht/0-2500"
+	url := "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2"
 
 	// Fetch the page
 	properties, err := FetchProperties(url)
@@ -91,4 +91,3 @@ func savePropertyToFile(property Property, outputDir string) {
 
 	fmt.Printf("   Saved to %s\n", filename)
 }
-
