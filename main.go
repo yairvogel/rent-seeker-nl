@@ -25,10 +25,15 @@ type Property struct {
 func main() {
 	// Parse command line arguments
 	outputDir := flag.String("output", "", "Directory to save property JSON files")
+	telegramToken := flag.String("token", "", "Telegram Bot API token")
 	flag.Parse()
 
 	if *outputDir == "" {
 		log.Fatal("Please provide an output directory using the -output flag")
+	}
+
+	if *telegramToken == "" {
+		log.Fatal("Please provide a Telegram Bot API token using the -token flag")
 	}
 
 	// Create output directory if it doesn't exist
@@ -36,39 +41,19 @@ func main() {
 		log.Fatalf("Failed to create output directory: %v", err)
 	}
 
-	// URL to fetch
-	url := "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2"
-
-	// Fetch the page
-	properties, err := FetchProperties(url)
+	// Initialize Telegram bot
+	bot, err := NewTelegramBot(*telegramToken)
 	if err != nil {
-		log.Fatalf("Error fetching properties: %v", err)
+		log.Fatalf("Failed to initialize Telegram bot: %v", err)
 	}
 
-	// Print the results and save new files
-	fmt.Printf("Found %d properties in Utrecht under €2500\n", len(properties))
+	// Start the bot in a goroutine
+	go bot.Start()
 
-	newCount := 0
-	for _, property := range properties {
-		// Check if property already exists
-		filename := filepath.Join(*outputDir, property.Hash+".json")
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			// This is a new property
-			newCount++
-			fmt.Printf("\nNEW PROPERTY: %s\n", property.Title)
-			fmt.Printf("   Address: %s\n", property.Address)
-			fmt.Printf("   Price: %d\n", property.PriceValue)
-			fmt.Printf("   Size: %s\n", property.Size)
-			fmt.Printf("   Rooms: %s\n", property.Rooms)
-			fmt.Printf("   URL: %s\n", property.URL)
-			fmt.Printf("   Hash: %s\n", property.Hash)
-
-			// Save property to JSON file
-			savePropertyToFile(property, *outputDir)
-		}
-	}
-
-	fmt.Printf("\nSummary: %d new properties found out of %d total listings\n", newCount, len(properties))
+	log.Println("Bot started successfully. Press Ctrl+C to exit.")
+	
+	// Keep the program running
+	select {}
 }
 
 // savePropertyToFile saves a property as a JSON file
