@@ -23,14 +23,14 @@ type Property struct {
 
 func main() {
 	// URL to fetch
-	url := "https://www.pararius.nl/huurwoningen/utrecht/0-2500"
-	
+	url := "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2"
+
 	// Fetch the page
 	properties, err := fetchProperties(url)
 	if err != nil {
 		log.Fatalf("Error fetching properties: %v", err)
 	}
-	
+
 	// Print the results
 	fmt.Printf("Found %d properties in Utrecht under €2500\n\n", len(properties))
 	for i, property := range properties {
@@ -50,42 +50,42 @@ func fetchProperties(url string) ([]Property, error) {
 		return nil, fmt.Errorf("failed to fetch URL: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP request failed with status code: %d", resp.StatusCode)
 	}
-	
+
 	// Parse HTML document
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse HTML: %v", err)
 	}
-	
+
 	var properties []Property
-	
+
 	// Find all property listings
 	doc.Find("section").Each(func(i int, s *goquery.Selection) {
 		// Extract property information
 		titleElem := s.Find("h2")
 		title := strings.TrimSpace(titleElem.Text())
-		
+
 		// Skip if not a property listing
 		if title == "" {
 			return
 		}
-		
+
 		// Get property URL
 		url, _ := titleElem.Find("a").Attr("href")
 		if url != "" {
 			url = "https://www.pararius.nl" + url
 		}
-		
+
 		// Get address
 		address := strings.TrimSpace(s.Find("div.listing-search-item__location").Text())
-		
+
 		// Get price
 		price := strings.TrimSpace(s.Find("div.listing-search-item__price").Text())
-		
+
 		// Get property details
 		var size, rooms string
 		s.Find("li.illustrated-features__item").Each(func(i int, feat *goquery.Selection) {
@@ -96,7 +96,7 @@ func fetchProperties(url string) ([]Property, error) {
 				rooms = text
 			}
 		})
-		
+
 		// Create property object
 		property := Property{
 			Title:   title,
@@ -106,9 +106,9 @@ func fetchProperties(url string) ([]Property, error) {
 			Rooms:   rooms,
 			URL:     url,
 		}
-		
+
 		properties = append(properties, property)
 	})
-	
+
 	return properties, nil
 }
