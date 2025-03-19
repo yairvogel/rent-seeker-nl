@@ -53,20 +53,30 @@ func main() {
 		log.Fatalf("Error fetching properties: %v", err)
 	}
 
-	// Print the results and save to files
-	fmt.Printf("Found %d properties in Utrecht under €2500\n\n", len(properties))
-	for i, property := range properties {
-		fmt.Printf("%d. %s\n", i+1, property.Title)
-		fmt.Printf("   Address: %s\n", property.Address)
-		fmt.Printf("   Price: %d\n", property.PriceValue)
-		fmt.Printf("   Size: %s\n", property.Size)
-		fmt.Printf("   Rooms: %s\n", property.Rooms)
-		fmt.Printf("   URL: %s\n", property.URL)
-		fmt.Printf("   Hash: %s\n\n", property.Hash)
-		
-		// Save property to JSON file
-		savePropertyToFile(property, *outputDir)
+	// Print the results and save new files
+	fmt.Printf("Found %d properties in Utrecht under €2500\n", len(properties))
+	
+	newCount := 0
+	for _, property := range properties {
+		// Check if property already exists
+		filename := filepath.Join(*outputDir, property.Hash+".json")
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			// This is a new property
+			newCount++
+			fmt.Printf("\nNEW PROPERTY: %s\n", property.Title)
+			fmt.Printf("   Address: %s\n", property.Address)
+			fmt.Printf("   Price: %d\n", property.PriceValue)
+			fmt.Printf("   Size: %s\n", property.Size)
+			fmt.Printf("   Rooms: %s\n", property.Rooms)
+			fmt.Printf("   URL: %s\n", property.URL)
+			fmt.Printf("   Hash: %s\n", property.Hash)
+			
+			// Save property to JSON file
+			savePropertyToFile(property, *outputDir)
+		}
 	}
+	
+	fmt.Printf("\nSummary: %d new properties found out of %d total listings\n", newCount, len(properties))
 }
 
 // savePropertyToFile saves a property as a JSON file
@@ -87,7 +97,7 @@ func savePropertyToFile(property Property, outputDir string) {
 		return
 	}
 	
-	fmt.Printf("Saved property to %s\n", filename)
+	fmt.Printf("   Saved to %s\n", filename)
 }
 
 func fetchProperties(url string) ([]Property, error) {
