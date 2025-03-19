@@ -93,8 +93,14 @@ func (t *TelegramBot) handleSubscribe(message *tgbotapi.Message, reply *tgbotapi
 func (t *TelegramBot) NotifySubscribers(message string) {
 	for chatID := range t.subscribers {
 		msg := tgbotapi.NewMessage(chatID, message)
+		msg.ParseMode = "Markdown"
 		if _, err := t.bot.Send(msg); err != nil {
 			log.Printf("Error sending notification to %d: %v", chatID, err)
 		}
 	}
+}
+
+// HasSubscribers returns true if there are any subscribers
+func (t *TelegramBot) HasSubscribers() bool {
+	return len(t.subscribers) > 0
 }
