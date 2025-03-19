@@ -51,7 +51,7 @@ func main() {
 	go bot.Start()
 
 	log.Println("Bot started successfully. Press Ctrl+C to exit.")
-	
+
 	// Keep the program running
 	select {}
 }

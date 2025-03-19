@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -73,20 +71,20 @@ func (t *TelegramBot) Start() {
 // handleSubscribe handles the /subscribe command
 func (t *TelegramBot) handleSubscribe(message *tgbotapi.Message, reply *tgbotapi.MessageConfig) {
 	chatID := message.Chat.ID
-	
+
 	// Check if already subscribed
 	if _, exists := t.subscribers[chatID]; exists {
 		reply.Text = "You are already subscribed to property notifications!"
 		return
 	}
-	
+
 	// Add new subscriber
 	t.subscribers[chatID] = Subscriber{
 		ChatID:    chatID,
 		FirstName: message.From.FirstName,
 		Username:  message.From.UserName,
 	}
-	
+
 	reply.Text = fmt.Sprintf("Thanks for subscribing, %s! You will now receive notifications about new property listings.", message.From.FirstName)
 	log.Printf("New subscriber: %s (ID: %d)", message.From.FirstName, chatID)
 }
