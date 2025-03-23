@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,6 @@ func main() {
 	// Parse command line arguments
 	outputDir := flag.String("output", "", "Directory to save property JSON files")
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
-	searchURL := flag.String("url", "https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2", "URL to search for properties")
 	flag.Parse()
 
 	if *outputDir == "" {
@@ -54,30 +54,46 @@ func main() {
 
 	log.Println("Bot started successfully. Property checks will run every 5 minutes.")
 
+	// Define search URLs
+	searchURLs := []string{
+		"https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2",
+		"https://www.pararius.nl/huurwoningen/haarlem/1000-2500/50m2",
+		"https://www.pararius.nl/huurwoningen/leiden/1000-2500/50m2",
+	}
+
 	// Start periodic property checks
-	go runPeriodicPropertyChecks(*searchURL, *outputDir, bot)
+	go runPeriodicPropertyChecks(searchURLs, *outputDir, bot)
 
 	// Keep the program running
 	select {}
 }
 
-// runPeriodicPropertyChecks runs property checks every 5 minutes
-func runPeriodicPropertyChecks(url, outputDir string, bot *TelegramBot) {
+// runPeriodicPropertyChecks runs property checks every 10 minutes
+func runPeriodicPropertyChecks(urls []string, outputDir string, bot *TelegramBot) {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
 	// Run once immediately
-	checkForNewProperties(url, outputDir, bot)
+	for _, url := range urls {
+		checkForNewProperties(url, outputDir, bot)
+	}
 
 	// Then run on ticker
 	for range ticker.C {
-		checkForNewProperties(url, outputDir, bot)
+		for _, url := range urls {
+			checkForNewProperties(url, outputDir, bot)
+		}
 	}
 }
 
 // checkForNewProperties checks for new properties and notifies subscribers
 func checkForNewProperties(url, outputDir string, bot *TelegramBot) {
-	log.Println("Checking for new properties...")
+	// Extract city name from URL for logging
+	cityName := "unknown"
+	if city := extractCityFromURL(url); city != "" {
+		cityName = city
+	}
+	log.Printf("Checking for new properties in %s...", cityName)
 
 	// Fetch properties
 	properties, err := FetchProperties(url)
@@ -86,7 +102,7 @@ func checkForNewProperties(url, outputDir string, bot *TelegramBot) {
 		return
 	}
 
-	log.Printf("Found %d properties in total", len(properties))
+	log.Printf("Found %d properties in %s", len(properties), cityName)
 
 	// Check for new properties
 	var newProperties []Property
@@ -144,6 +160,19 @@ func formatPropertyMessage(property Property) string {
 	message += fmt.Sprintf("🔗 [View on Pararius](%s)", property.URL)
 
 	return message
+}
+
+// extractCityFromURL extracts the city name from a Pararius URL
+func extractCityFromURL(url string) string {
+	// Simple extraction based on URL format
+	// Example: https://www.pararius.nl/huurwoningen/utrecht/1000-2500/50m2
+	parts := strings.Split(url, "/")
+	for i, part := range parts {
+		if part == "huurwoningen" && i+1 < len(parts) {
+			return strings.Title(parts[i+1])
+		}
+	}
+	return ""
 }
 
 // savePropertyToFile saves a property as a JSON file
