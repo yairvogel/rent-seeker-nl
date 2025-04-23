@@ -65,7 +65,11 @@ func (t *TelegramBot) Start() {
 
 		switch update.Message.Command() {
 		case "start":
-			msg.Text = "Welcome to the Property Notifier Bot! Use /subscribe to get notifications about new property listings."
+			startMessage := "Welcome to the Property Notifier Bot! Use /subscribe to get notifications about new property listings."
+			if args := update.Message.CommandArguments(); args != "" {
+				startMessage += fmt.Sprintf(" got message %s", args)
+			}
+			msg.Text = startMessage
 		case "subscribe":
 			t.handleSubscribe(update.Message, &msg)
 		case "unsubscribe":
