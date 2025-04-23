@@ -174,7 +174,7 @@ func (t *TelegramBot) saveSubscribers() error {
 // loadSubscribers loads subscribers from a JSON file
 func (t *TelegramBot) loadSubscribers() error {
 	filePath := filepath.Join("subscribers", "subscribers.json")
-	
+
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		log.Println("No subscribers file found, starting with empty subscribers list")
