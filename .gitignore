@@ -1,2 +1,4 @@
 .aider*
 properties/
+.env
+property-bot

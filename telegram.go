@@ -137,7 +137,8 @@ func (t *TelegramBot) handleSubscribe(message *tgbotapi.Message, reply *tgbotapi
 }
 
 // NotifySubscribers sends a notification to all subscribers
-func (t *TelegramBot) NotifySubscribers(message string) {
+func (t *TelegramBot) NotifySubscribers(property Property) {
+	message := formatPropertyMessage(property)
 	for chatID := range t.subscribers {
 		msg := tgbotapi.NewMessage(chatID, message)
 		msg.ParseMode = "Markdown"
@@ -145,6 +146,31 @@ func (t *TelegramBot) NotifySubscribers(message string) {
 			log.Printf("Error sending notification to %d: %v", chatID, err)
 		}
 	}
+}
+
+// formatPropertyMessage formats a property as a message for Telegram
+func formatPropertyMessage(property Property) string {
+	var priceStr string
+	if property.PriceValue > 0 {
+		priceStr = fmt.Sprintf("€%d", property.PriceValue)
+	} else {
+		priceStr = "Price unknown"
+	}
+
+	message := fmt.Sprintf("📍*%s*\n", property.Title)
+	if property.Address != "" {
+		message += fmt.Sprintf(" %s\n", property.Address)
+	}
+	message += fmt.Sprintf("💰 %s\n", priceStr)
+	if property.Size != "" {
+		message += fmt.Sprintf("📏 %s\n", property.Size)
+	}
+	if property.Rooms != "" {
+		message += fmt.Sprintf("🚪 %s\n", property.Rooms)
+	}
+	message += fmt.Sprintf("🔗 [View More](%s)", property.URL)
+
+	return message
 }
 
 // saveSubscribers saves the current subscribers to a JSON file
