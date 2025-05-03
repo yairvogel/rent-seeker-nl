@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
@@ -26,9 +26,9 @@ func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the request body
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		http.Error(w, "Error reading request body", http.StatusMethodNotAllowed)
 		return
 	}
 	defer r.Body.Close()
@@ -65,8 +65,9 @@ func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Subscription created successfully",
+		"status":    "success",
+		"message":   "Subscription created successfully",
+		"sessionId": "SampleSessionId",
 	})
 }
 
