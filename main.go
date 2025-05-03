@@ -24,9 +24,11 @@ func main() {
 	outputDir := flag.String("output", "", "Directory to save property JSON files")
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
 	httpPort := flag.String("port", "8080", "HTTP server port")
+	disableJob := flag.Bool("disable-job", false, "Disable periodic property checks")
 	flag.Parse()
 
-	if *outputDir == "" {
+	// Only require outputDir if job is enabled
+	if !*disableJob && *outputDir == "" {
 		log.Fatal("Please provide an output directory using the -output flag")
 	}
 
@@ -34,9 +36,11 @@ func main() {
 		log.Fatal("Please provide a Telegram Bot API token using the -token flag")
 	}
 
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(*outputDir, 0755); err != nil {
-		log.Fatalf("Failed to create output directory: %v", err)
+	// Create output directory if it doesn't exist and job is enabled
+	if !*disableJob {
+		if err := os.MkdirAll(*outputDir, 0755); err != nil {
+			log.Fatalf("Failed to create output directory: %v", err)
+		}
 	}
 
 	// Initialize Telegram bot
@@ -58,10 +62,17 @@ func main() {
 		"Rotterdam": {"https://www.pararius.nl/huurwoningen/rotterdam"},
 	}
 
-	go RunPeriodicPropertyChecks(searchUrls, *outputDir, bot)
+	// Start the HTTP server
 	go RunHTTPServer(*httpPort)
-
 	log.Printf("HTTP server started on port %s", *httpPort)
+
+	// Start periodic property checks if not disabled
+	if !*disableJob {
+		log.Println("Starting periodic property checks...")
+		go RunPeriodicPropertyChecks(searchUrls, *outputDir, bot)
+	} else {
+		log.Println("Periodic property checks are disabled")
+	}
 
 	// Keep the program running
 	select {}
