@@ -23,6 +23,7 @@ func main() {
 	// Parse command line arguments
 	outputDir := flag.String("output", "", "Directory to save property JSON files")
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
+	httpPort := flag.String("port", "8080", "HTTP server port")
 	flag.Parse()
 
 	if *outputDir == "" {
@@ -59,6 +60,11 @@ func main() {
 
 	// Start periodic property checks
 	go RunPeriodicPropertyChecks(searchUrls, *outputDir, bot)
+	
+	// Start HTTP server
+	StartHTTPServer(*httpPort)
+	
+	log.Printf("HTTP server started on port %s", *httpPort)
 
 	// Keep the program running
 	select {}
