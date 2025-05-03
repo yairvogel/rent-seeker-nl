@@ -8,6 +8,25 @@ import (
 	"net/http"
 )
 
+// enableCORS is middleware that adds CORS headers to responses
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Call the next handler
+		next(w, r)
+	}
+}
+
 // SubscriptionData represents the subscription data sent from the frontend
 type SubscriptionData struct {
 	Cities     []string `json:"cities"`
@@ -20,7 +39,7 @@ type SubscriptionData struct {
 // handleCreateSubscription handles the POST request to create a new subscription
 func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPost && r.Method != http.MethodOptions {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -78,8 +97,8 @@ func RunHTTPServer(port string) {
 		fmt.Fprintf(w, "Hello World!")
 	})
 
-	// Define the create-subscription endpoint
-	http.HandleFunc("/create-subscription", handleCreateSubscription)
+	// Define the create-subscription endpoint with CORS support
+	http.HandleFunc("/create-subscription", enableCORS(handleCreateSubscription))
 
 	// Start the server in a goroutine
 	log.Printf("Starting HTTP server on port %s...", port)
