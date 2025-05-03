@@ -58,12 +58,9 @@ func main() {
 		"Rotterdam": {"https://www.pararius.nl/huurwoningen/rotterdam"},
 	}
 
-	// Start periodic property checks
 	go RunPeriodicPropertyChecks(searchUrls, *outputDir, bot)
-	
-	// Start HTTP server
-	StartHTTPServer(*httpPort)
-	
+	go RunHTTPServer(*httpPort)
+
 	log.Printf("HTTP server started on port %s", *httpPort)
 
 	// Keep the program running
