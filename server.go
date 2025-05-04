@@ -42,7 +42,52 @@ type SubscriptionData struct {
 }
 
 func createPortalSession(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello, world!")
+	// Only accept POST requests
+	if r.Method != http.MethodPost && r.Method != http.MethodOptions {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Read the request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Parse the JSON data
+	var data struct {
+		CustomerID string `json:"customerId"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		http.Error(w, "Error parsing JSON data", http.StatusBadRequest)
+		return
+	}
+
+	// Validate customer ID
+	if data.CustomerID == "" {
+		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Create portal session
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(data.CustomerID),
+		ReturnURL: stripe.String("https://example.com/account"),
+	}
+	s, err := portalsession.New(params)
+	if err != nil {
+		log.Printf("Error creating portal session: %v", err)
+		http.Error(w, "Error creating portal session", http.StatusInternalServerError)
+		return
+	}
+
+	// Return session URL
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"url": s.URL,
+	})
 }
 
 // createCheckoutSession handles the POST request to create a new subscription
@@ -88,16 +133,43 @@ func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("New subscription: %+v", subscriptionData)
 
-	// Create stripe subscription
-	var checkoutParams *stripe.CheckoutSessionParams
+	// Create stripe checkout session
+	params := &stripe.CheckoutSessionParams{
+		SuccessURL: stripe.String("https://example.com/success?session_id={CHECKOUT_SESSION_ID}"),
+		CancelURL:  stripe.String("https://example.com/cancel"),
+		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				Price:    stripe.String(os.Getenv("STRIPE_PRICE_ID")),
+				Quantity: stripe.Int64(1),
+			},
+		},
+		CustomerEmail: stripe.String(subscriptionData.Email),
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+			Metadata: map[string]string{
+				"cities":     fmt.Sprintf("%v", subscriptionData.Cities),
+				"priceMin":   fmt.Sprintf("%d", subscriptionData.PriceRange[0]),
+				"priceMax":   fmt.Sprintf("%d", subscriptionData.PriceRange[1]),
+				"areaMin":    fmt.Sprintf("%d", subscriptionData.LivingArea[0]),
+				"areaMax":    fmt.Sprintf("%d", subscriptionData.LivingArea[1]),
+			},
+		},
+	}
 
-	// Return success response
+	s, err := session.New(params)
+	if err != nil {
+		log.Printf("Error creating checkout session: %v", err)
+		http.Error(w, "Error creating checkout session", http.StatusInternalServerError)
+		return
+	}
+
+	// Return session ID and URL
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":    "success",
-		"message":   "Subscription created successfully",
-		"sessionId": "SampleSessionId",
+		"sessionId": s.ID,
+		"url":       s.URL,
 	})
 }
 
