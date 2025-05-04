@@ -3,9 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/stripe/stripe-go/v82"
+	portalsession "github.com/stripe/stripe-go/v82/billingportal/session"
+	"github.com/stripe/stripe-go/v82/checkout/session"
+	"github.com/stripe/stripe-go/v82/price"
+	"github.com/stripe/stripe-go/v82/webhook"
 	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
 // enableCORS is middleware that adds CORS headers to responses
@@ -33,11 +39,14 @@ type SubscriptionData struct {
 	PriceRange []int    `json:"priceRange"`
 	LivingArea []int    `json:"livingArea"`
 	Email      string   `json:"email"`
-	Amount     int      `json:"amount"`
 }
 
-// handleCreateSubscription handles the POST request to create a new subscription
-func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
+func createPortalSession(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "Hello, world!")
+}
+
+// createCheckoutSession handles the POST request to create a new subscription
+func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
 	if r.Method != http.MethodPost && r.Method != http.MethodOptions {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -77,8 +86,10 @@ func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Save the subscription data to a database or file
 	log.Printf("New subscription: %+v", subscriptionData)
+
+	// Create stripe subscription
+	var checkoutParams *stripe.CheckoutSessionParams
 
 	// Return success response
 	w.Header().Set("Content-Type", "application/json")
@@ -92,13 +103,11 @@ func handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
 
 // RunHTTPServer starts a simple HTTP server on the specified port
 func RunHTTPServer(port string) {
-	// Define the root handler
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello World!")
-	})
+	stripe.Key = os.Getenv("STRIPE_KEY")
 
 	// Define the create-subscription endpoint with CORS support
-	http.HandleFunc("/create-subscription", enableCORS(handleCreateSubscription))
+	http.HandleFunc("/create-checkout-session", enableCORS(createCheckoutSession))
+	http.HandleFunc("/create-portal-session", enableCORS(createPortalSession))
 
 	// Start the server in a goroutine
 	log.Printf("Starting HTTP server on port %s...", port)
