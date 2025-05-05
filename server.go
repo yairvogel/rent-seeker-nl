@@ -5,7 +5,7 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/price"
-	// "github.com/stripe/stripe-go/v82/webhook"
+	"github.com/stripe/stripe-go/v82/customer"
 	"io"
 	"log"
 	"net/http"
@@ -55,21 +55,48 @@ func verifyPayment(w http.ResponseWriter, r *http.Request) {
 
 	// Parse the JSON data
 	var data struct {
-		sessionId string `json:"sessionId"`
+		SessionId string `json:"sessionId"`
 	}
 	if err := json.Unmarshal(body, &data); err != nil {
 		http.Error(w, "Error parsing JSON data", http.StatusBadRequest)
 		return
 	}
 
-	// Validate customer ID
-	if data.sessionId == "" {
-		http.Error(w, "session ID is required", http.StatusBadRequest)
+	// Validate session ID
+	if data.SessionId == "" {
+		http.Error(w, "Session ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// verify payment here
+	// Retrieve the checkout session from Stripe
+	s, err := session.Get(data.sessionId, nil)
+	if err != nil {
+		log.Printf("Error retrieving session: %v", err)
+		http.Error(w, "Error verifying payment", http.StatusInternalServerError)
+		return
+	}
 
+	// Check if payment was successful
+	if s.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
+		http.Error(w, "Payment not completed", http.StatusBadRequest)
+		return
+	}
+
+	// Extract subscription data from metadata
+	subscription := s.Subscription
+	if subscription == nil {
+		http.Error(w, "No subscription found", http.StatusBadRequest)
+		return
+	}
+
+	// Return success response with subscription details
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":         "success",
+		"subscriptionId": subscription.ID,
+		"customerId":     s.Customer.ID,
+		"paymentStatus":  s.PaymentStatus,
+	})
 }
 
 // createCheckoutSession handles the POST request to create a new subscription
