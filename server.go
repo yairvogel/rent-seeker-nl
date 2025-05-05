@@ -5,11 +5,16 @@ import (
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/price"
-	"github.com/stripe/stripe-go/v82/customer"
 	"io"
 	"log"
 	"net/http"
 )
+
+type VerifyPaymentResponse struct {
+	Status     string `json:"status"`
+	AccessCode string `json:"accessCode"`
+	Error      string `json:"error"`
+}
 
 // enableCORS is middleware that adds CORS headers to responses
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
@@ -40,62 +45,58 @@ type SubscriptionData struct {
 
 func verifyPayment(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
-	if r.Method != http.MethodPost && r.Method != http.MethodOptions {
+	if r.Method != http.MethodGet && r.Method != http.MethodOptions {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Read the request body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	// Parse the JSON data
-	var data struct {
-		SessionId string `json:"sessionId"`
-	}
-	if err := json.Unmarshal(body, &data); err != nil {
-		http.Error(w, "Error parsing JSON data", http.StatusBadRequest)
-		return
-	}
+	sessionId := r.PathValue("sessionId")
 
 	// Validate session ID
-	if data.SessionId == "" {
+	if sessionId == "" {
 		http.Error(w, "Session ID is required", http.StatusBadRequest)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+
 	// Retrieve the checkout session from Stripe
-	s, err := session.Get(data.sessionId, nil)
+	s, err := session.Get(sessionId, nil)
 	if err != nil {
-		log.Printf("Error retrieving session: %v", err)
-		http.Error(w, "Error verifying payment", http.StatusInternalServerError)
+		log.Printf("[VerifyPayment][%s]Error retrieving session: %v", sessionId, err)
+		encoder.Encode(VerifyPaymentResponse{
+			Status: "failed",
+			Error:  "Error retrieving session data",
+		})
 		return
 	}
 
 	// Check if payment was successful
 	if s.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
-		http.Error(w, "Payment not completed", http.StatusBadRequest)
+		log.Printf("[VerifyPayment][%s] Payment not completed", sessionId)
+		encoder.Encode(VerifyPaymentResponse{
+			Status: "failed",
+			Error:  "payment noot completed",
+		})
 		return
 	}
 
 	// Extract subscription data from metadata
 	subscription := s.Subscription
 	if subscription == nil {
-		http.Error(w, "No subscription found", http.StatusBadRequest)
+		log.Printf("[VerifyPayment][%s] No subscription found", sessionId)
+		encoder.Encode(VerifyPaymentResponse{
+			Status: "failed",
+			Error:  "No subscription found",
+		})
 		return
 	}
 
 	// Return success response with subscription details
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":         "success",
-		"subscriptionId": subscription.ID,
-		"customerId":     s.Customer.ID,
-		"paymentStatus":  s.PaymentStatus,
+	encoder.Encode(VerifyPaymentResponse{
+		Status:     "success",
+		AccessCode: "some-random-stuff",
 	})
 }
 
@@ -205,7 +206,7 @@ func RunHTTPServer(port, stripeKey string) {
 
 	// Define the create-subscription endpoint with CORS support
 	http.HandleFunc("/create-checkout-session", enableCORS(createCheckoutSession))
-	http.HandleFunc("/verify-payment", enableCORS(verifyPayment))
+	http.HandleFunc("/payment/{sessionId}", enableCORS(verifyPayment))
 
 	// Start the server in a goroutine
 	log.Printf("Starting HTTP server on port %s...", port)

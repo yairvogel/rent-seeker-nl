@@ -25,6 +25,7 @@ func main() {
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
 	httpPort := flag.String("port", "8080", "HTTP server port")
 	disableJob := flag.Bool("disable-job", false, "Disable periodic property checks")
+	stripeKey := flag.String("stripe-key", "", "Stripe API key")
 	flag.Parse()
 
 	// Only require outputDir if job is enabled
@@ -32,7 +33,7 @@ func main() {
 		log.Fatal("Please provide an output directory using the -output flag")
 	}
 
-	if *telegramToken == "" {
+	if !*disableJob && *telegramToken == "" {
 		log.Fatal("Please provide a Telegram Bot API token using the -token flag")
 	}
 
@@ -63,7 +64,7 @@ func main() {
 	}
 
 	// Start the HTTP server
-	go RunHTTPServer(*httpPort)
+	go RunHTTPServer(*httpPort, *stripeKey)
 	log.Printf("HTTP server started on port %s", *httpPort)
 
 	// Start periodic property checks if not disabled

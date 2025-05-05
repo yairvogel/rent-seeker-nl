@@ -23,7 +23,11 @@ build: deps
 # Run the bot (requires TELEGRAM_TOKEN environment variable)
 .PHONY: run
 run: build
-	./$(BINARY_NAME) -output $(OUTPUT_DIR) -token $(TELEGRAM_TOKEN)
+	./$(BINARY_NAME) -port $(SERVICE_PORT) -output $(OUTPUT_DIR) -token $(TELEGRAM_TOKEN) -stripe-key $(STRIPE_KEY)
+
+.PHONY: runServer
+runServer: build
+	./$(BINARY_NAME) -disable-job -port $(SERVICE_PORT) -token $(TELEGRAM_TOKEN) -stripe-key $(STRIPE_KEY)
 
 # Clean build artifacts
 .PHONY: clean
