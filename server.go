@@ -2,16 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/stripe/stripe-go/v82"
-	portalsession "github.com/stripe/stripe-go/v82/billingportal/session"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/price"
-	"github.com/stripe/stripe-go/v82/webhook"
+	// "github.com/stripe/stripe-go/v82/webhook"
 	"io"
 	"log"
 	"net/http"
-	"os"
 )
 
 // enableCORS is middleware that adds CORS headers to responses
@@ -41,7 +38,7 @@ type SubscriptionData struct {
 	Email      string   `json:"email"`
 }
 
-func createPortalSession(w http.ResponseWriter, r *http.Request) {
+func verifyPayment(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
 	if r.Method != http.MethodPost && r.Method != http.MethodOptions {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -58,7 +55,7 @@ func createPortalSession(w http.ResponseWriter, r *http.Request) {
 
 	// Parse the JSON data
 	var data struct {
-		CustomerID string `json:"customerId"`
+		sessionId string `json:"sessionId"`
 	}
 	if err := json.Unmarshal(body, &data); err != nil {
 		http.Error(w, "Error parsing JSON data", http.StatusBadRequest)
@@ -66,28 +63,13 @@ func createPortalSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate customer ID
-	if data.CustomerID == "" {
-		http.Error(w, "Customer ID is required", http.StatusBadRequest)
+	if data.sessionId == "" {
+		http.Error(w, "session ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Create portal session
-	params := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(data.CustomerID),
-		ReturnURL: stripe.String("https://example.com/account"),
-	}
-	s, err := portalsession.New(params)
-	if err != nil {
-		log.Printf("Error creating portal session: %v", err)
-		http.Error(w, "Error creating portal session", http.StatusInternalServerError)
-		return
-	}
+	// verify payment here
 
-	// Return session URL
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"url": s.URL,
-	})
 }
 
 // createCheckoutSession handles the POST request to create a new subscription
@@ -118,6 +100,10 @@ func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "At least one city must be selected", http.StatusBadRequest)
 		return
 	}
+	if len(subscriptionData.Cities) > 4 {
+		http.Error(w, "Too many cities in selection", http.StatusBadRequest)
+		return
+	}
 	if len(subscriptionData.PriceRange) != 2 {
 		http.Error(w, "Price range must have min and max values", http.StatusBadRequest)
 		return
@@ -132,28 +118,43 @@ func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("New subscription: %+v", subscriptionData)
+	var lookupKey string
+	switch len(subscriptionData.Cities) {
+	case 1:
+		lookupKey = "single_city"
+	case 2:
+		lookupKey = "two_cities"
+	case 3:
+		lookupKey = "three_cities"
+	case 4:
+		lookupKey = "four_cities"
+	default:
+		return
+	}
+
+	domain := "http://localhost:8080"
+
+	priceListParams := &stripe.PriceListParams{
+		LookupKeys: stripe.StringSlice([]string{lookupKey}),
+	}
+
+	i := price.List(priceListParams)
+	var price *stripe.Price
+	for i.Next() {
+		p := i.Price()
+		price = p
+	}
 
 	// Create stripe checkout session
 	params := &stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String("https://example.com/success?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:  stripe.String("https://example.com/cancel"),
+		SuccessURL: stripe.String(domain + "/payment-success?session_id={CHECKOUT_SESSION_ID}"),
+		CancelURL:  stripe.String(domain + "/cancel"),
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-		LineItems: []*stripe.CheckoutSessionLineItemParams{
-			{
-				Price:    stripe.String(os.Getenv("STRIPE_PRICE_ID")),
-				Quantity: stripe.Int64(1),
-			},
-		},
-		CustomerEmail: stripe.String(subscriptionData.Email),
-		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
-			Metadata: map[string]string{
-				"cities":     fmt.Sprintf("%v", subscriptionData.Cities),
-				"priceMin":   fmt.Sprintf("%d", subscriptionData.PriceRange[0]),
-				"priceMax":   fmt.Sprintf("%d", subscriptionData.PriceRange[1]),
-				"areaMin":    fmt.Sprintf("%d", subscriptionData.LivingArea[0]),
-				"areaMax":    fmt.Sprintf("%d", subscriptionData.LivingArea[1]),
-			},
-		},
+		LineItems: []*stripe.CheckoutSessionLineItemParams{{Price: stripe.String(price.ID),
+			Quantity: stripe.Int64(1),
+		}},
+		CustomerEmail:    stripe.String(subscriptionData.Email),
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{},
 	}
 
 	s, err := session.New(params)
@@ -167,19 +168,17 @@ func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":    "success",
-		"sessionId": s.ID,
-		"url":       s.URL,
+		"redirectUrl": s.URL,
 	})
 }
 
 // RunHTTPServer starts a simple HTTP server on the specified port
-func RunHTTPServer(port string) {
-	stripe.Key = os.Getenv("STRIPE_KEY")
+func RunHTTPServer(port, stripeKey string) {
+	stripe.Key = stripeKey
 
 	// Define the create-subscription endpoint with CORS support
 	http.HandleFunc("/create-checkout-session", enableCORS(createCheckoutSession))
-	http.HandleFunc("/create-portal-session", enableCORS(createPortalSession))
+	http.HandleFunc("/verify-payment", enableCORS(verifyPayment))
 
 	// Start the server in a goroutine
 	log.Printf("Starting HTTP server on port %s...", port)
