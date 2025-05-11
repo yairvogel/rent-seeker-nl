@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// Start the HTTP server
-	go RunHTTPServer(*httpPort, *stripeKey, newRelicApp)
+	go RunHTTPServer(*httpPort, "", newRelicApp)
 	log.Printf("HTTP server started on port %s", *httpPort)
 
 	// Start periodic property checks if not disabled

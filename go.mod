@@ -8,7 +8,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/newrelic/go-agent/v3 v3.38.0
-	github.com/stripe/stripe-go/v82 v82.1.0
 )
 
 require (
