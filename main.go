@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"log"
 	"os"
 )
@@ -25,8 +26,18 @@ func main() {
 	telegramToken := flag.String("token", "", "Telegram Bot API token")
 	httpPort := flag.String("port", "8080", "HTTP server port")
 	disableJob := flag.Bool("disable-job", false, "Disable periodic property checks")
-	stripeKey := flag.String("stripe-key", "", "Stripe API key")
+	newrelicKey := flag.String("newrelic-key", "", "newrelic key")
 	flag.Parse()
+
+	newRelicApp, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("earlybird-back"),
+		newrelic.ConfigLicense(*newrelicKey),
+		newrelic.ConfigAppLogForwardingEnabled(true),
+	)
+
+	if err != nil {
+		log.Fatalf("failed initializing newrelic app: %v", err)
+	}
 
 	// Only require outputDir if job is enabled
 	if !*disableJob && *outputDir == "" {
@@ -64,7 +75,7 @@ func main() {
 	}
 
 	// Start the HTTP server
-	go RunHTTPServer(*httpPort, *stripeKey)
+	go RunHTTPServer(*httpPort, *stripeKey, newRelicApp)
 	log.Printf("HTTP server started on port %s", *httpPort)
 
 	// Start periodic property checks if not disabled

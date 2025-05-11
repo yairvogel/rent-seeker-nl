@@ -2,13 +2,29 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/checkout/session"
-	"github.com/stripe/stripe-go/v82/price"
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/checkout/session"
+	"github.com/stripe/stripe-go/v82/price"
 )
+
+func RunHTTPServer(port, stripeKey string, newRelicApplication *newrelic.Application) {
+	// stripe.Key = stripeKey
+
+	// Define the create-subscription endpoint with CORS support
+	http.HandleFunc(newrelic.WrapHandleFunc(newRelicApplication, "/create-checkout-session", enableCORS(createCheckoutSession)))
+	http.HandleFunc(newrelic.WrapHandleFunc(newRelicApplication, "/payment/{sessionId}", enableCORS(verifyPayment)))
+
+	// Start the server in a goroutine
+	log.Printf("Starting HTTP server on port %s...", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatalf("HTTP server error: %v", err)
+	}
+}
 
 type VerifyPaymentResponse struct {
 	Status     string `json:"status"`
@@ -198,19 +214,4 @@ func createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"redirectUrl": s.URL,
 	})
-}
-
-// RunHTTPServer starts a simple HTTP server on the specified port
-func RunHTTPServer(port, stripeKey string) {
-	stripe.Key = stripeKey
-
-	// Define the create-subscription endpoint with CORS support
-	http.HandleFunc("/create-checkout-session", enableCORS(createCheckoutSession))
-	http.HandleFunc("/payment/{sessionId}", enableCORS(verifyPayment))
-
-	// Start the server in a goroutine
-	log.Printf("Starting HTTP server on port %s...", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatalf("HTTP server error: %v", err)
-	}
 }
